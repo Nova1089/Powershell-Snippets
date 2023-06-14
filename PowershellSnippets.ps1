@@ -271,18 +271,145 @@ function Read-HostAndValidate($prompt, $regex, $warning)
     return $response
 }
 
-function SafelyInvoke-RestMethod($uri, $method, $headers, $body)
+function SafelyInvoke-RestMethod($method, $uri, $headers, $body)
 {
     try
     {
-        $response = Invoke-RestMethod -Uri $uri -Method $method -Headers $headers -Body $body -ErrorVariable "responseError"
+        $response = Invoke-RestMethod -Method $method -Uri $uri -Headers $headers -Body $body -ErrorVariable "responseError"
     }
     catch
     {
-        Write-Host $responseError -ForegroundColor $failColor
+        Write-Host $responseError[0].Message -ForegroundColor $failColor
         exit
     }
 
     return $response
 }
 
+function Convert-SecureStringToPsCredential($secureString)
+{
+    # Just passing "null" for username, because username will not be used.
+    return New-Object System.Management.Automation.PSCredential("null", $secureString)
+}
+
+function Convert-SecureStringToPlainText($secureString)
+{
+    $bstr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureString)
+    return [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr)
+}
+
+function ConvertTo-Base64($text)
+{
+    return [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($text))
+}
+
+function Convert-PsCredentialToBase64($psCredential)
+{
+    # append :x because FreshDesk expecting that (could x or anything else)
+    return ConvertTo-Base64 ($psCredential.GetNetworkCredential().Password + ":X") 
+}
+
+function ConvertFrom-Base64($base64Text)
+{
+    return [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($base64Text))
+}
+
+function Prompt-Csv($expectedHeaders)
+{
+    do
+    {
+        $path = Read-Host "Enter path to CSV"
+        $path = $path.Trim('"')
+        $extension = [IO.Path]::GetExtension($path)
+
+        if ($extension -ne '.csv')
+        {
+            Write-Warning "File type is $extension. Please enter a CSV."
+            $keepGoing = $true
+            continue
+        }
+
+        try
+        {
+            $records = Import-CSV -Path $path -ErrorAction SilentlyContinue
+        }
+        catch
+        {
+            Write-Warning "CSV not found."
+            $keepGoing = $true
+            continue
+        }
+
+        if ($records.Count -eq 0)
+        {
+            Write-Warning "CSV is empty."
+            $keepGoing = $true
+            continue
+        }
+
+        $hasExpectedHeaders = Validate-CsvHeaders -ImportedCsv $records -ExpectedHeaders $expectedHeaders
+        if (-not($hasExpectedHeaders))
+        {
+            $keepGoing = $true
+            continue
+        }
+        
+        $keepGoing = $false
+    }
+    while ($keepGoing)
+
+    Write-Host "CSV was found and validated." -ForegroundColor $successColor
+
+    return $records
+}
+
+function Validate-CsvHeaders($importedCsv, $expectedHeaders)
+{
+    $hasExpectedHeaders = $true
+
+    if ($null -eq $expectedHeaders)
+    {
+        return $true
+    }
+
+    foreach ($header in $expectedHeaders)
+    {
+        # check if first record has a property named $header
+        if ($importedCsv[0].psobject.properties.match($header).Count -eq 0)
+        {
+            Write-Warning "CSV is missing a header called $header."
+            $hasExpectedHeaders = $false
+        }
+    }
+    
+    if (-not($hasExpectedHeaders))
+    {
+        Write-Host "Please add the missing headers and try again." -ForegroundColor $warningColor
+    }
+
+    return $hasExpectedHeaders
+}
+
+function Prompt-TextFile
+{
+    do
+    {
+        $path = Read-Host "Enter path to .txt file. (i.e. C:\FileName.txt)"
+        $path = $path.Trim('"')
+        $content = Get-Content -Path $path -ErrorAction SilentlyContinue
+
+        if ($null -eq $content)
+        {
+            Write-Warning "File not found or contents are empty."
+            $keepGoing = $true
+            continue
+        }
+        else
+        {
+            $keepGoing = $false
+        }
+    }
+    while ($keepGoing)
+
+    return $content
+}
