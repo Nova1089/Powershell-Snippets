@@ -183,7 +183,7 @@ function New-TimeStamp
     return (Get-Date -Format yyyy-MM-dd-hh-mm).ToString()
 }
 
-# new version
+# new version basic
 function Prompt-YesOrNo($question)
 {
     Write-Host "$question`n[Y] Yes  [N] No"
@@ -222,6 +222,7 @@ function Prompt-YesOrNo($question)
     return $false   
 }
 
+# new version advanced
 function Prompt-YesOrNo($question, [switch]$includeYesToAll, [switch]$includeNoToAll)
 {
     $prompt = ("$question`n" + 
@@ -412,4 +413,23 @@ function Prompt-TextFile
     while ($keepGoing)
 
     return $content
+}
+
+function Parse-StringWithDelimiter($string, $delimiter)
+{
+    return ($string.Split("$delimiter")).Trim()
+}
+
+function Validate-Email($email)
+{
+    # Expects email in format of word1.word2@domain.com where word1 is first name and word2 is last name.  
+    $isValidEmail = $email -imatch '^\s*[\w\.-]+\.[\w\.-]+@[\w\.-]+\.\w{2,4}\s*$'
+    
+    if (-not($isValidEmail))
+    {
+        Write-Warning ("Email is invalid: $email `n" +
+                "    Expected format is firstname.lastname@domain.com `n")
+    }
+
+    return $isValidEmail
 }
