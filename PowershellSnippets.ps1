@@ -3,7 +3,7 @@ function Initialize-ColorScheme
     $script:successColor = "Green"
     $script:infoColor = "DarkCyan"
     $script:failColor = "Red"
-    # warning color is yellow, but that is built into Write-Warning
+    $script:warningColor = "Yellow"
 }
 
 function Show-Introduction
