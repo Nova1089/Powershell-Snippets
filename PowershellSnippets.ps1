@@ -2,8 +2,8 @@ function Initialize-ColorScheme
 {
     $script:successColor = "Green"
     $script:infoColor = "DarkCyan"
-    $script:failColor = "Red"
     $script:warningColor = "Yellow"
+    $script:failColor = "Red"    
 }
 
 function Show-Introduction
