@@ -150,6 +150,37 @@ function TryConnect-MsolService
     }
 }
 
+function TryConnect-AzureAD
+{
+    $connected = Test-ConnectedToAzureAD
+
+    while (-not($connected))
+    {
+        Write-Host "Connecting to Azure AD..." -ForegroundColor $infoColor
+        Connect-AzureAD -ErrorAction SilentlyContinue | Out-Null
+
+        $connected = Test-ConnectedToAzureAD
+        if (-not($connected))
+        {
+            Write-Warning "Failed to connect to Azure AD."
+            Read-Host "Press Enter to try again"
+        }
+    }
+}
+
+function Test-ConnectedToAzureAD
+{
+    try
+    {
+        Get-AzureADCurrentSessionInfo -ErrorAction SilentlyContinue | Out-Null
+    }
+    catch
+    {
+        return $false
+    }
+    return $true
+}
+
 # new
 function New-DesktopPath($fileName, $fileExt, [switch]$includeTimeStamp)
 {
@@ -180,7 +211,13 @@ function Get-DesktopPath
 
 function New-TimeStamp
 {
-    return (Get-Date -Format yyyy-MM-dd-hh-mm).ToString()
+    return (Get-Date -Format yyyy-MM-dd-hh-mmtt).ToString()
+}
+
+function Show-TimeStamp
+{
+    $timeStamp = Get-Date -Format yyyy-MM-dd-hh-mmtt
+    Write-Host $timestamp -ForegroundColor $infoColor
 }
 
 # new version basic
@@ -277,6 +314,21 @@ function SafelyInvoke-RestMethod($method, $uri, $headers, $body)
     try
     {
         $response = Invoke-RestMethod -Method $method -Uri $uri -Headers $headers -Body $body -ErrorVariable "responseError"
+    }
+    catch
+    {
+        Write-Host $responseError[0].Message -ForegroundColor $failColor
+        exit
+    }
+
+    return $response
+}
+
+function SafelyInvoke-WebRequest($method, $uri, $headers, $body)
+{
+    try
+    {
+        $response = Invoke-WebRequest -Method $method -Uri $uri -Headers $headers -Body $body -ErrorVariable "responseError"
     }
     catch
     {
@@ -432,4 +484,42 @@ function Validate-Email($email)
     }
 
     return $isValidEmail
+}
+
+function Get-FilePathWithoutExtension($path)
+{
+    $folder = Split-Path -Path $path -Parent
+    $fileName = Split-Path -Path $path -Leaf
+    $baseFileName = [System.IO.Path]::GetFileNameWithoutExtension($fileName)
+    return "$folder\$baseFileName"
+}
+
+function Test-FileHasExtension([string]$fileName, [string]$extension)
+{
+    $actualExtension = [System.IO.Path]::GetExtension($fileName)
+    return $actualExtension -ieq $extension.Trim()
+}
+
+function Test-IsMemberOfGroup($azureUser, $groupUpn)
+{
+    $userMemberships = Get-AzureADUserMembership -ObjectId $azureUser.ObjectId
+
+    foreach ($group in $userMemberships)
+    {
+        if ($group.Mail -ieq $groupUpn)
+        {
+            return $true
+        }
+    }
+    return $false
+}
+
+function Test-IsMemberOfGroup($userUpn, $groupUpn)
+{
+    return ($null -ne (Get-AzureADGroup -SearchString $groupUpn | Get-AzureADGroupMember -All $true | Where-Object { $_.UserPrincipalName -ieq $userUpn }))
+}
+
+function Get-NameFromEmail($email)
+{
+    return ($email.Split('@'))[0]
 }
