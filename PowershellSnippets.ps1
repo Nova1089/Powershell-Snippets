@@ -537,12 +537,35 @@ function Write-ProgressInPipeline
 
     Begin 
     { 
-        $itemsProcessed = 0 
+        $itemsProcessed = 1
     }
 
     Process
     {
         Write-Progress -Activity $activity -Status "$itemsProcessed $status"
+        $itemsProcessed++
+        return $_
+    }
+}
+
+function Write-ObjectInPipeline
+{
+    [Cmdletbinding()]
+    Param
+    (
+        [Parameter(Position=0, Mandatory=$true, ValueFromPipeline=$true)]
+        [object[]] $inputObjects,
+        [string] $activity = "Processing items..."
+    )
+
+    Begin 
+    { 
+        $itemsProcessed = 1
+    }
+
+    Process
+    {
+        Write-Progress -Activity $activity -Status "$itemsProcessed`: $($_.ToString())"
         $itemsProcessed++
         return $_
     }
