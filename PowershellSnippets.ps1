@@ -523,3 +523,27 @@ function Get-NameFromEmail($email)
 {
     return ($email.Split('@'))[0]
 }
+
+function Write-ProgressInPipeline
+{
+    [Cmdletbinding()]
+    Param
+    (
+        [Parameter(Position=0, Mandatory=$true, ValueFromPipeline=$true)]
+        [object[]] $inputObjects,
+        [string] $activity = "Processing items...",
+        [string] $status = "items processed"
+    )
+
+    Begin 
+    { 
+        $itemsProcessed = 0 
+    }
+
+    Process
+    {
+        Write-Progress -Activity $activity -Status "$itemsProcessed $status"
+        $itemsProcessed++
+        return $_
+    }
+}
