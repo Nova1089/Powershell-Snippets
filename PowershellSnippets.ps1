@@ -8,7 +8,7 @@ function Initialize-ColorScheme
 
 function Show-Introduction
 {
-    Write-Host "This script exports Azure AD user info." -ForegroundColor $infoColor
+    Write-Host "This script does some stuff..." -ForegroundColor $infoColor
     Read-Host "Press Enter to continue"
 }
 
@@ -93,13 +93,40 @@ function Test-SessionPrivileges
 function TryConnect-MgGraph
 {
     $connected = Test-ConnectedToMgGraph
-
     while(-not($connected))
     {
         Write-Host "Connecting to Microsoft Graph..." -ForegroundColor $infoColor
         Connect-MgGraph -ErrorAction SilentlyContinue | Out-Null
         $connected = Test-ConnectedToMgGraph
 
+        if (-not($connected))
+        {
+            Read-Host "Failed to connect to Microsoft Graph. Press Enter to try again"
+        }
+        else
+        {
+            Write-Host "Successfully connected!" -ForegroundColor $successColor
+        }
+    }    
+}
+
+function TryConnect-MgGraph($scopes)
+{
+    $connected = Test-ConnectedToMgGraph
+    while (-not($connected))
+    {
+        Write-Host "Connecting to Microsoft Graph..." -ForegroundColor $infoColor
+
+        if ($null -ne $scopes)
+        {
+            Connect-MgGraph -Scopes $scopes -ErrorAction SilentlyContinue | Out-Null
+        }
+        else
+        {
+            Connect-MgGraph -ErrorAction SilentlyContinue | Out-Null
+        }
+
+        $connected = Test-ConnectedToMgGraph
         if (-not($connected))
         {
             Read-Host "Failed to connect to Microsoft Graph. Press Enter to try again"
@@ -543,6 +570,29 @@ function Write-ProgressInPipeline
     Process
     {
         Write-Progress -Activity $activity -Status "$itemsProcessed $status"
+        $itemsProcessed++
+        return $_
+    }
+}
+
+function Write-ObjectInPipeline
+{
+    [Cmdletbinding()]
+    Param
+    (
+        [Parameter(Position = 0, Mandatory = $true, ValueFromPipeline = $true)]
+        [object[]] $inputObjects,
+        [string] $activity = "Processing items..."
+    )
+
+    Begin 
+    { 
+        $itemsProcessed = 1
+    }
+
+    Process
+    {
+        Write-Progress -Activity $activity -Status "$itemsProcessed`: $($_.ToString())"
         $itemsProcessed++
         return $_
     }
