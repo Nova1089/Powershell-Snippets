@@ -564,7 +564,7 @@ function Write-ProgressInPipeline
 
     Begin 
     { 
-        $itemsProcessed = 0 
+        $itemsProcessed = 1
     }
 
     Process
