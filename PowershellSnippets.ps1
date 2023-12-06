@@ -597,3 +597,33 @@ function Write-ObjectInPipeline
         return $_
     }
 }
+
+function Prompt-SelectSiteFromList($sites)
+{
+    Write-Host "Select the desired site."
+
+    $index = 1
+    foreach ($site in $sites)
+    {
+        Write-Host "[$index] $($site.WebUrl)"
+        $index++
+    }
+    
+    do
+    {
+        $selectedIndex = Read-Host
+        $selectedIndex = $selectedIndex.Trim()
+
+        if (($selectedIndex -notmatch '^\d+$') -or # check if answer is a digit
+            ($selectedIndex -lt 1) -or
+            ($selectedIndex -gt $sites.Count))
+        {
+            Write-Warning "Please enter a digit from 1 to $($sites.Count)."
+            $keepGoing = $true
+            continue
+        }
+    }
+    while ($keepGoing)
+
+    return $sites[$selectedIndex - 1]
+}
