@@ -627,3 +627,32 @@ function Prompt-SelectSiteFromList($sites)
 
     return $sites[$selectedIndex - 1]
 }
+
+function Format-FileSize($sizeInBytes)
+{
+    if ($sizeInBytes -lt 1KB)
+    {
+        $formattedSize = $sizeInBytes.ToString() + " B"
+    }
+    elseif ($sizeInBytes -lt 1MB)
+    {
+        $formattedSize = $sizeInBytes / 1KB
+        $formattedSize = ("{0:n2}" -f $sizeInBytes) + " KB"
+    }
+    elseif ($sizeInBytes -lt 1GB)
+    {
+        $formattedSize = $sizeInBytes / 1MB
+        $formattedSize = ("{0:n2}" -f $sizeInBytes) + " MB"
+    }
+    elseif ($sizeInBytes -lt 1TB)
+    {
+        $formattedSize = $sizeInBytes / 1GB
+        $formattedSize = ("{0:n2}" -f $sizeInBytes) + " GB"
+    }
+    elseif ($sizeInBytes -ge 1TB)
+    {
+        $formattedSize = $sizeInBytes / 1TB
+        $formattedSize = ("{0:n2}" -f $sizeInBytes) + " TB"
+    }
+    return $formattedSize
+}
