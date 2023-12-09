@@ -656,3 +656,15 @@ function Format-FileSize($sizeInBytes)
     }
     return $formattedSize
 }
+
+function Get-SubstringWithRegex($string, $regex)
+{
+    if ($string -match $regex)
+    {
+        return $matches[0]
+    }
+    else
+    {
+        Write-Warning "Could not find substring in string: $string with regex: $regex"
+    }
+}
