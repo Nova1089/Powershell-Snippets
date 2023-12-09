@@ -1,9 +1,9 @@
 function Initialize-ColorScheme
 {
-    $script:successColor = "Green"
-    $script:infoColor = "DarkCyan"
-    $script:warningColor = "Yellow"
-    $script:failColor = "Red"    
+    Set-Variable -Name "successColor" -Value "Green" -Scope "Script" -Option "Constant"
+    Set-Variable -Name "infoColor" -Value "DarkCyan" -Scope "Script" -Option "Constant"
+    Set-Variable -Name "warningColor" -Value "Yellow" -Scope "Script" -Option "Constant"
+    Set-Variable -Name "failColor" -Value "Red" -Scope "Script" -Option "Constant"
 }
 
 function Show-Introduction
@@ -637,22 +637,22 @@ function Format-FileSize($sizeInBytes)
     elseif ($sizeInBytes -lt 1MB)
     {
         $formattedSize = $sizeInBytes / 1KB
-        $formattedSize = ("{0:n2}" -f $sizeInBytes) + " KB"
+        $formattedSize = ("{0:n2}" -f $formattedSize) + " KB"
     }
     elseif ($sizeInBytes -lt 1GB)
     {
         $formattedSize = $sizeInBytes / 1MB
-        $formattedSize = ("{0:n2}" -f $sizeInBytes) + " MB"
+        $formattedSize = ("{0:n2}" -f $formattedSize) + " MB"
     }
     elseif ($sizeInBytes -lt 1TB)
     {
         $formattedSize = $sizeInBytes / 1GB
-        $formattedSize = ("{0:n2}" -f $sizeInBytes) + " GB"
+        $formattedSize = ("{0:n2}" -f $formattedSize) + " GB"
     }
     elseif ($sizeInBytes -ge 1TB)
     {
         $formattedSize = $sizeInBytes / 1TB
-        $formattedSize = ("{0:n2}" -f $sizeInBytes) + " TB"
+        $formattedSize = ("{0:n2}" -f $formattedSize) + " TB"
     }
     return $formattedSize
 }
