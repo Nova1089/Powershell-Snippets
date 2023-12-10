@@ -661,6 +661,7 @@ function Get-SubstringWithRegex($string, $regex)
 {
     if ($string -match $regex)
     {
+        # $matches is an automatic variable that is populated when using the -match operator.
         return $matches[0]
     }
     else
