@@ -669,3 +669,65 @@ function Get-SubstringWithRegex($string, $regex)
         Write-Warning "Could not find substring in string: $string with regex: $regex"
     }
 }
+
+function Get-Percent($divisor, $dividend)
+{
+    $percent = $divisor / $dividend * 100
+    $roundedToInt = [Math]::Round($percent)
+    return "$roundedToInt%"
+}
+
+function Show-Separator($title, [ConsoleColor]$color = "DarkCyan", [switch]$noLineBreaks)
+{
+    if ($title)
+    {
+        $separator = " $title "
+    }
+    else
+    {
+        $separator = ""
+    }
+
+    # Truncate if it's too long.
+    If (($separator.length - 6) -gt ((Get-host).UI.RawUI.BufferSize.Width))
+    {
+        $separator = $separator.Remove((Get-host).UI.RawUI.BufferSize.Width - 5)
+    }
+
+    # Pad with dashes.
+    $separator = "--$($separator.PadRight(((Get-host).UI.RawUI.BufferSize.Width)-3,"-"))"
+
+    if (-not($noLineBreaks))
+    {        
+        # Add line breaks.
+        $separator = "`n$separator`n"
+    }
+
+    Write-Host $separator -ForegroundColor $color
+}
+
+function Show-Separator2
+{
+    Param
+    (
+        [ValidateSet("Blue", "Green", "Cyan", "Red", "Magenta", "Yellow", "Gray", "White", "Black")]
+        $color = "Cyan",  
+
+        [parameter(Position = 0)]
+        $title
+    )
+
+    # Pad the title with spaces.
+    $separator = " $title "
+
+    # Truncate the string if it is to long.
+    If (($separator.length - 6) -gt ((Get-host).UI.RawUI.BufferSize.Width))
+    {
+        $separator = $separator.Remove((Get-host).UI.RawUI.BufferSize.Width - 5)
+    }
+
+    # Pad the string with dashes.
+    $separator = "--$($separator.PadRight(((Get-host).UI.RawUI.BufferSize.Width)-3,"-"))"
+
+    Write-Host $separator -ForegroundColor $color
+}
