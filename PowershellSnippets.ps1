@@ -513,6 +513,19 @@ function Validate-Email($email)
     return $isValidEmail
 }
 
+function Validate-BrsEmail($email)
+{
+    $isValidEmail = $email -imatch '^\s*[\w\.-]+\.[\w\.-]+(@blueravensolar\.com)\s*$'
+    
+    if (-not($isValidEmail))
+    {
+        Write-Warning ("Email is invalid: $email `n" +
+            "    Expected format is PreferredFirstName.LastName@blueravensolar.com `n")
+    }
+
+    return $isValidEmail
+}
+
 function Get-FilePathWithoutExtension($path)
 {
     $folder = Split-Path -Path $path -Parent
