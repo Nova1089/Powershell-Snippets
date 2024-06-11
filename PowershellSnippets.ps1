@@ -345,6 +345,7 @@ function SafelyInvoke-RestMethod($method, $uri, $headers, $body)
     catch
     {
         Write-Host $responseError[0].Message -ForegroundColor $failColor
+        Read-Host "Press Enter to exit"
         exit
     }
 
@@ -360,6 +361,7 @@ function SafelyInvoke-WebRequest($method, $uri, $headers, $body)
     catch
     {
         Write-Host $responseError[0].Message -ForegroundColor $failColor
+        Read-Host "Press Enter to exit"
         exit
     }
 
@@ -392,6 +394,23 @@ function Convert-PsCredentialToBase64($psCredential)
 function ConvertFrom-Base64($base64Text)
 {
     return [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($base64Text))
+}
+
+function Encode-UriQueryParams($queryParams)
+{ 
+    return [uri]::EscapeDataString($queryParams)
+}
+
+function Encode-Uri($uri)
+{ 
+    return [uri]::EscapeUriString($uri)
+}
+
+function Encode-Uri($uri)
+{ 
+    $encodedUri = [uri]::EscapeUriString($uri)
+    $encodedUri = $encodedUri.Replace("'", "%27")
+    return $encodedUri
 }
 
 function Prompt-Csv($expectedHeaders)
