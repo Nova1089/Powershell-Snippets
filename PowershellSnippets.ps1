@@ -368,6 +368,35 @@ function SafelyInvoke-WebRequest($method, $uri, $headers, $body)
     return $response
 }
 
+# Version that handles FreshService API rate limits.
+function SafelyInvoke-WebRequest($method, $uri, $headers, $body)
+{
+    try
+    {
+        $response = Invoke-WebRequest -Method $method -Uri $uri -Headers $headers -Body $body -ErrorVariable "responseError"
+    }
+    catch
+    {
+        if ([int]$_.Exception.Response.StatusCode -eq 429)
+        {
+            $responseHeaders = $_.Exception.Response.Headers
+            $secondsToWait = [int]$responseHeaders["Retry-After"]
+            Write-Host "API is enforcing rate limits. Waiting $secondsToWait seconds to make the next call." -ForegroundColor $infoColor
+            Start-SleepTimer -Seconds $secondsToWait
+            $response = SafelyInvoke-WebRequest -Method $method -Uri $uri -Headers $headers -Body $body
+            if ($response.Content) { return $response.Content | ConvertFrom-Json }
+            return
+        }
+
+        Write-Host $responseError[0].Message -ForegroundColor $failColor
+        Read-Host "Press Enter to exit"
+        exit
+    }
+
+    if ($response.Content) { return $response.Content | ConvertFrom-Json }
+}
+
+
 function Convert-SecureStringToPsCredential($secureString)
 {
     # Just passing "null" for username, because username will not be used.
@@ -762,4 +791,13 @@ function Show-Separator2
     $separator = "--$($separator.PadRight(((Get-host).UI.RawUI.BufferSize.Width)-3,"-"))"
 
     Write-Host $separator -ForegroundColor $color
+}
+
+function Start-SleepTimer($seconds)
+{
+    for ($i = 0; $i -lt $seconds; $i++)
+    {
+        Write-Progress -Activity "Waiting..." -Status "$i / $seconds seconds"
+        Start-Sleep -Seconds 1
+    }
 }
