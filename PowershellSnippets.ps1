@@ -235,10 +235,27 @@ function Get-DesktopPath
     return [Environment]::GetFolderPath("Desktop")
 }
 
-
+# v1
 function New-TimeStamp
 {
-    return (Get-Date -Format yyyy-MM-dd-hh-mmtt).ToString()
+    return Get-Date -Format 'yyyy-MM-dd-hh-mmtt'
+}
+
+# v2
+function New-TimeStamp
+{
+    return Get-Date -Format 'yyyy-mm-dd a\t hh:mm tt'
+}
+
+# v3
+function New-TimeStamp
+{
+    return Get-Date -Format 'MMMM d, yyyy a\t hh:mm tt'
+}
+
+function Get-SimpleTimestamp($dateTimeOb)
+{
+    return $dateTimeOb | Get-Date -Format 'MMMM d, yyyy a\t hh:mm tt'
 }
 
 function Show-TimeStamp
@@ -396,6 +413,30 @@ function SafelyInvoke-WebRequest($method, $uri, $headers, $body)
     if ($response.Content) { return $response.Content | ConvertFrom-Json }
 }
 
+function Get-TempPassword
+{
+    $words = @("red", "orange", "yellow", "green", "blue", "purple", "silver", "gold", "flower", "mushroom", "lake", "river",
+        "mountain", "valley", "jungle", "cavern", "rain", "thunder", "lightning", "storm", "fire", "lion", "wolf", "bear", "hawk",
+        "dragon", "goblin", "fairy", "wizard", "sun", "moon", "emerald", "ruby", "saphire", "diamond", "treasure", "journey", "voyage",
+        "adventure", "quest", "song", "dance", "painting", "magic", "castle", "dungeon", "tower", "sword", "torch", "potion")
+    $specialChars = @('!', '@', '#', '$', '%', '^', '&', '*', '-', '+', '=', '?')
+
+    $word1 = $words | Get-Random
+    $coinFlip = Get-Random -Maximum 2 # max exclusive
+    if ($coinFlip -eq 1) { $word1 = $word1.ToUpper() }
+    
+    $word2 = $words | Get-Random
+    $coinFlip = Get-Random -Maximum 2 # max exclusive
+    if ($coinFlip -eq 1) { $word2 = $word2.ToUpper() }
+
+    $word3 = $words | Get-Random
+    $coinFlip = Get-Random -Maximum 2 # max exclusive
+    if ($coinFlip -eq 1) { $word3 = $word3.ToUpper() }
+
+    $specialChar = $specialChars | Get-Random
+    $num = Get-Random -Maximum 100 # max exclusive
+    return $word1 + '/' + $word2 + '/' + $word3 + '/' + $specialChar + $num
+}
 
 function Convert-SecureStringToPsCredential($secureString)
 {
@@ -551,7 +592,6 @@ function Validate-Email($email)
 {
     # Expects email in format of word1.word2@domain.com where word1 is first name and word2 is last name.  
     $isValidEmail = $email -imatch '^\s*[\w\.-]+\.[\w\.-]+@[\w\.-]+\.\w{2,4}\s*$'
-    
     if (-not($isValidEmail))
     {
         Write-Warning ("Email is invalid: $email `n" +
@@ -561,7 +601,12 @@ function Validate-Email($email)
     return $isValidEmail
 }
 
-function Validate-BrsEmail($email)
+function Test-ValidEmail($email)
+{
+    return = $email -imatch '^\S+@[\w\.-]+\.\w{2,4}$'
+}
+
+function Test-ValidBrsEmail($email)
 {
     $isValidEmail = $email -imatch '^\s*[\w\.-]+\.[\w\.-]+(@blueravensolar\.com)\s*$'
     
@@ -800,4 +845,38 @@ function Start-SleepTimer($seconds)
         Write-Progress -Activity "Waiting..." -Status "$i / $seconds seconds"
         Start-Sleep -Seconds 1
     }
+}
+
+function Invoke-GetWithRetry([ScriptBlock]$scriptBlock, $initialDelayInSeconds = 2, $maxRetries = 4)
+{
+    # API may not have the info we're trying to get yet. This will automatically retry a set amount of times.
+
+    $retryCount = 0
+    $delay = $initialDelayInSeconds
+    do
+    {
+        # The call operator (&). Invokes a script block in a new script scope.
+        # https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_operators?view=powershell-7.4#call-operator-
+        $response = & $scriptBlock
+
+        if ($null -eq $response)
+        {
+            if ($retryCount -ge 2)
+            { 
+                Write-Warning "$scriptBlock returned null. Retrying in $delay seconds..."
+                Start-SleepTimer -Seconds $delay
+            }
+            else
+            {
+                Start-Sleep -Seconds $delay
+            }            
+            $delay *= 2
+            $retryCount++
+        }
+    }
+    while (($null -eq $response) -and ($retryCount -lt $maxRetries))
+
+    if ($retryCount -ge $maxRetries) { Write-Warning "Timed out trying to get a response." }
+
+    return $response
 }
