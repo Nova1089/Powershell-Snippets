@@ -14,14 +14,14 @@ function Show-Introduction
 
 function Use-Module($moduleName)
 {    
-    $keepGoing = -not(Test-ModuleInstalled $moduleName)
+    $keepGoing = -not(Confirm-ModuleInstalled $moduleName)
     while ($keepGoing)
     {
         Prompt-InstallModule $moduleName
-        Test-SessionPrivileges
+        Confirm-AdminPrivilege
         Install-Module $moduleName
 
-        if ((Test-ModuleInstalled $moduleName) -eq $true)
+        if ((Confirm-ModuleInstalled $moduleName) -eq $true)
         {
             Write-Host "Importing module..." -ForegroundColor $infoColor
             Import-Module $moduleName
@@ -30,7 +30,7 @@ function Use-Module($moduleName)
     }
 }
 
-function Test-ModuleInstalled($moduleName)
+function Confirm-ModuleInstalled($moduleName)
 {    
     $module = Get-Module -Name $moduleName -ListAvailable
     return ($null -ne $module)
@@ -42,7 +42,7 @@ function Prompt-InstallModule($moduleName)
     do 
     {
         Write-Host "$moduleName module is required." -ForegroundColor $infoColor
-        $confirmInstall = Read-Host -Prompt "Would you like to install the module? (y/n)"
+        $confirmInstall = Read-Host "Would you like to install the module? (y/n)"
     }
     while ($confirmInstall -inotmatch "^\s*y\s*$") # regex matches a y but allows spaces
 }
@@ -59,7 +59,7 @@ function Prompt-InstallModule($moduleName)
 }
 
 # new version
-function Test-SessionPrivileges
+function Confirm-AdminPrivilege
 {
     $currentPrincipal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
     $currentSessionIsAdmin = $currentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
@@ -76,7 +76,7 @@ function Test-SessionPrivileges
 }
 
 # old version
-function Test-SessionPrivileges
+function Confirm-AdminPrivilege
 {
     $currentPrincipal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
     $currentSessionIsAdmin = $currentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
@@ -92,12 +92,12 @@ function Test-SessionPrivileges
 
 function TryConnect-MgGraph
 {
-    $connected = Test-ConnectedToMgGraph
+    $connected = Confirm-ConnectedToMgGraph
     while(-not($connected))
     {
         Write-Host "Connecting to Microsoft Graph..." -ForegroundColor $infoColor
         Connect-MgGraph -ErrorAction SilentlyContinue | Out-Null
-        $connected = Test-ConnectedToMgGraph
+        $connected = Confirm-ConnectedToMgGraph
 
         if (-not($connected))
         {
@@ -112,7 +112,7 @@ function TryConnect-MgGraph
 
 function TryConnect-MgGraph($scopes)
 {
-    $connected = Test-ConnectedToMgGraph
+    $connected = $null -ne (Get-MgContext)
     while (-not($connected))
     {
         Write-Host "Connecting to Microsoft Graph..." -ForegroundColor $infoColor
@@ -126,21 +126,17 @@ function TryConnect-MgGraph($scopes)
             Connect-MgGraph -ErrorAction SilentlyContinue | Out-Null
         }
 
-        $connected = Test-ConnectedToMgGraph
+        $connected = $null -ne (Get-MgContext)
         if (-not($connected))
         {
-            Read-Host "Failed to connect to Microsoft Graph. Press Enter to try again"
+            Write-Host "Failed to connect to Microsoft Graph." -ForegroundColor $script:warningColor
+            Read-Host "Press Enter to try again"
         }
         else
         {
             Write-Host "Successfully connected!" -ForegroundColor $successColor
         }
     }    
-}
-
-function Test-ConnectedToMgGraph
-{
-    return $null -ne (Get-MgContext)
 }
 
 function TryConnect-ExchangeOnline
@@ -150,12 +146,12 @@ function TryConnect-ExchangeOnline
     while ($null -eq $connectionStatus)
     {
         Write-Host "Connecting to Exchange Online..."
-        Connect-ExchangeOnline -ErrorAction SilentlyContinue
+        Connect-ExchangeOnline -ErrorAction "SilentlyContinue" -ShowBanner:$false -ForegroundColor $infoColor
         $connectionStatus = Get-ConnectionInformation
-
         if ($null -eq $connectionStatus)
         {
-            Read-Host -Prompt "Failed to connect to Exchange Online. Press Enter to try again"
+            Write-Host "Failed to connect to Exchange Online." -ForegroundColor $script:warningColor
+            Read-Host "Press Enter to try again"
         }
     }
 }
@@ -179,14 +175,14 @@ function TryConnect-MsolService
 
 function TryConnect-AzureAD
 {
-    $connected = Test-ConnectedToAzureAD
+    $connected = Confirm-ConnectedToAzureAD
 
     while (-not($connected))
     {
         Write-Host "Connecting to Azure AD..." -ForegroundColor $infoColor
         Connect-AzureAD -ErrorAction SilentlyContinue | Out-Null
 
-        $connected = Test-ConnectedToAzureAD
+        $connected = Confirm-ConnectedToAzureAD
         if (-not($connected))
         {
             Write-Warning "Failed to connect to Azure AD."
@@ -195,7 +191,7 @@ function TryConnect-AzureAD
     }
 }
 
-function Test-ConnectedToAzureAD
+function Confirm-ConnectedToAzureAD
 {
     try
     {
@@ -206,6 +202,44 @@ function Test-ConnectedToAzureAD
         return $false
     }
     return $true
+}
+
+function TryConnect-JumpCloud
+{
+    # JCOrgId is a global variable set by Connect-JCOnline.
+    $connected = ($JCOrgId -ne $null)
+
+    while (-not($connected))
+    {
+        $keepGoing = $true
+        do
+        {
+            $apiKey = Read-Host "Enter your JumpCloud API key"
+            if ($apiKey -ne "")
+            {
+                $keepGoing = $false
+            }
+
+            $apiKey = $apiKey.Trim()
+
+            if ($apiKey.Length -ne 40)
+            {
+                Write-Host "API key should be 40 characters." -ForegroundColor $script:warningColor
+                $keepGoing = $true
+            }
+        }
+        while ($keepGoing)        
+        
+        Write-Host "Connecting to JumpCloud..." -ForegroundColor $infoColor
+        Connect-JCOnline -JumpCloudApiKey $apiKey -Force | Out-Null
+
+        $connected = ($JCOrgId -ne $null)
+        if (-not($connected))
+        {
+            Write-Host "Failed to connect to JumpCloud." -ForegroundColor $script:warningColor
+            Read-Host "Press Enter to try again"
+        }
+    }
 }
 
 # new
@@ -244,7 +278,7 @@ function New-TimeStamp
 # v2
 function New-TimeStamp
 {
-    return Get-Date -Format 'yyyy-mm-dd a\t hh:mm tt'
+    return Get-Date -Format 'yyyy-MM-dd hh:mm tt'
 }
 
 # v3
@@ -256,6 +290,20 @@ function New-TimeStamp
 function Get-SimpleTimestamp($dateTimeOb)
 {
     return $dateTimeOb | Get-Date -Format 'MMMM d, yyyy a\t hh:mm tt'
+}
+
+# Simple timestamp
+function Show-TimeStamp
+{
+    Write-Host ((Get-Date).DateTime) -ForegroundColor $script:infoColor
+}
+
+# Timestamp with timezone
+function Show-TimeStamp
+{
+    # UFormat descriptions here: https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/get-date?view=powershell-5.1#notes
+    $timestamp = Get-Date -UFormat "%A, %D, %r, UTC %Z"
+    Write-Host $timestamp -ForegroundColor $script:infoColor
 }
 
 function Show-TimeStamp
@@ -413,7 +461,7 @@ function SafelyInvoke-WebRequest($method, $uri, $headers, $body)
     if ($response.Content) { return $response.Content | ConvertFrom-Json }
 }
 
-function Get-TempPassword
+function New-TempPassword
 {
     $words = @("red", "orange", "yellow", "green", "blue", "purple", "silver", "gold", "flower", "mushroom", "lake", "river",
         "mountain", "valley", "jungle", "cavern", "rain", "thunder", "lightning", "storm", "fire", "lion", "wolf", "bear", "hawk",
@@ -481,6 +529,22 @@ function Encode-Uri($uri)
     $encodedUri = [uri]::EscapeUriString($uri)
     $encodedUri = $encodedUri.Replace("'", "%27")
     return $encodedUri
+}
+
+function Append-QueryParams($uri, [Hashtable]$queryParams)
+{
+    # If URI doesn't end in ? mark, then append ? mark.
+    if ($uri[-1] -ne '?') { $uri = $uri + '?' }
+
+    foreach ($pair in $queryParams.GetEnumerator())
+    {
+        $uri = $uri + [uri]::EscapeDataString($pair.Key) + '=' + [uri]::EscapeDataString($pair.Value) + '&'
+    }
+
+    # If URI ends in & sign, remove ending & sign.
+    if ($uri[-1] -eq '&') { $uri = $uri.TrimEnd('&') }
+
+    return $uri    
 }
 
 function Prompt-Csv($expectedHeaders)
@@ -601,12 +665,12 @@ function Validate-Email($email)
     return $isValidEmail
 }
 
-function Test-ValidEmail($email)
+function Confirm-ValidEmail($email)
 {
     return = $email -imatch '^\S+@[\w\.-]+\.\w{2,4}$'
 }
 
-function Test-ValidBrsEmail($email)
+function Confirm-ValidBrsEmail($email)
 {
     $isValidEmail = $email -imatch '^\s*[\w\.-]+\.[\w\.-]+(@blueravensolar\.com)\s*$'
     
@@ -627,13 +691,13 @@ function Get-FilePathWithoutExtension($path)
     return "$folder\$baseFileName"
 }
 
-function Test-FileHasExtension([string]$fileName, [string]$extension)
+function Confirm-FileHasExtension([string]$fileName, [string]$extension)
 {
     $actualExtension = [System.IO.Path]::GetExtension($fileName)
     return $actualExtension -ieq $extension.Trim()
 }
 
-function Test-IsMemberOfGroup($azureUser, $groupUpn)
+function Confirm-IsMemberOfGroup($azureUser, $groupUpn)
 {
     $userMemberships = Get-AzureADUserMembership -ObjectId $azureUser.ObjectId
 
@@ -647,7 +711,7 @@ function Test-IsMemberOfGroup($azureUser, $groupUpn)
     return $false
 }
 
-function Test-IsMemberOfGroup($userUpn, $groupUpn)
+function Confirm-IsMemberOfGroup($userUpn, $groupUpn)
 {
     return ($null -ne (Get-AzureADGroup -SearchString $groupUpn | Get-AzureADGroupMember -All $true | Where-Object { $_.UserPrincipalName -ieq $userUpn }))
 }
@@ -783,6 +847,39 @@ function Get-Percent($divisor, $dividend)
     return "$roundedToInt%"
 }
 
+# new
+function Show-Separator($title, [ConsoleColor]$color = "DarkCyan", [switch]$noLineBreaks)
+{
+    if ($title)
+    {
+        $separator = " $title "
+    }
+    else
+    {
+        $separator = ""
+    }
+    $hostWidthInChars = (Get-host).UI.RawUI.BufferSize.Width
+
+    # Truncate title if it's too long.
+    if (($separator.length) -gt $hostWidthInChars)
+    {
+        $separator = $separator.Remove($hostWidthInChars - 5)
+        $separator += " "
+    }
+
+    # Pad with dashes.
+    $separator = "--$($separator.PadRight($hostWidthInChars - 2, "-"))"
+
+    if (-not($noLineBreaks))
+    {        
+        # Add line breaks.
+        $separator = "`n$separator`n"
+    }
+
+    Write-Host $separator -ForegroundColor $color
+}
+
+# old
 function Show-Separator($title, [ConsoleColor]$color = "DarkCyan", [switch]$noLineBreaks)
 {
     if ($title)
@@ -795,7 +892,7 @@ function Show-Separator($title, [ConsoleColor]$color = "DarkCyan", [switch]$noLi
     }
 
     # Truncate if it's too long.
-    If (($separator.length - 6) -gt ((Get-host).UI.RawUI.BufferSize.Width))
+    if (($separator.length - 6) -gt ((Get-host).UI.RawUI.BufferSize.Width))
     {
         $separator = $separator.Remove((Get-host).UI.RawUI.BufferSize.Width - 5)
     }
