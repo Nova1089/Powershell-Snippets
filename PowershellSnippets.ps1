@@ -146,7 +146,7 @@ function TryConnect-ExchangeOnline
     while ($null -eq $connectionStatus)
     {
         Write-Host "Connecting to Exchange Online..."
-        Connect-ExchangeOnline -ErrorAction "SilentlyContinue" -ShowBanner:$false -ForegroundColor $infoColor
+        Connect-ExchangeOnline -ErrorAction "SilentlyContinue" -ShowBanner:$false
         $connectionStatus = Get-ConnectionInformation
         if ($null -eq $connectionStatus)
         {
@@ -206,8 +206,8 @@ function Confirm-ConnectedToAzureAD
 
 function TryConnect-JumpCloud
 {
-    # JCOrgId is a global variable set by Connect-JCOnline.
-    $connected = ($JCOrgId -ne $null)
+    # JCAPIKEY is a global variable set by Connect-JCOnline.
+    $connected = ($null -ne $global:JCAPIKEY)
 
     while (-not($connected))
     {
@@ -230,10 +230,10 @@ function TryConnect-JumpCloud
         }
         while ($keepGoing)        
         
-        Write-Host "Connecting to JumpCloud..." -ForegroundColor $infoColor
+        Write-Host "Connecting to JumpCloud..." -ForegroundColor $script:infoColor
         Connect-JCOnline -JumpCloudApiKey $apiKey -Force | Out-Null
 
-        $connected = ($JCOrgId -ne $null)
+        $connected = ($null -ne $global:JCAPIKEY)
         if (-not($connected))
         {
             Write-Host "Failed to connect to JumpCloud." -ForegroundColor $script:warningColor
@@ -977,3 +977,125 @@ function Invoke-GetWithRetry([ScriptBlock]$scriptBlock, $initialDelayInSeconds =
 
     return $response
 }
+
+function Invoke-ApiCallWithRetry([ScriptBlock]$scriptBlock, $initialDelayInSeconds = 2, $maxRetries = 4)
+{
+    $retryCount = 0
+    $delay = $initialDelayInSeconds
+    do
+    {
+        # The call operator (&). Invokes a script block in a new script scope.
+        # https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_operators?view=powershell-7.4#call-operator-
+        $response = & $scriptBlock
+
+        if ($null -eq $response)
+        {
+            if ($retryCount -ge 2)
+            { 
+                Write-Warning "$scriptBlock returned null. Retrying in $delay seconds..."
+                Start-SleepTimer -Seconds $delay
+            }
+            else
+            {
+                Start-Sleep -Seconds $delay
+            }            
+            $delay *= 2
+            $retryCount++
+        }
+    }
+    while (($null -eq $response) -and ($retryCount -lt $maxRetries))
+
+    if ($retryCount -ge $maxRetries) { Write-Warning "Timed out trying to get a response." }
+
+    return $response
+}
+
+function Install-MSI($msiPath, [switch]$unattended, [switch]$waitUntilDone)
+{
+    $arguments = @("/i", "`"$msiPath`"", "/promptrestart")
+    if ($unattended)
+    {
+        # Specifies unattended mode, which means it shows a progress bar, but requires no manual inputs.
+        $arguments += "/passive"
+    }
+
+    if ($waitUntilDone)
+    {
+        # Using the Wait switch. Script will wait for the install to complete before continuing.
+        # Docs on msiexec.exe https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/msiexec
+        Start-Process "msiexec.exe" -ArgumentList $arguments -NoNewWindow -Wait
+    }
+    else
+    {
+        Start-Process "msiexec.exe" -ArgumentList $arguments -NoNewWindow
+    }
+}
+
+function Log-Info($message, $logPath = ".\logs.txt")
+{
+    $message = "[$(Get-Date -Format 'yyyy-MM-dd hh:mm tt') I] $message"
+    Write-Output $message | Tee-Object -FilePath $logPath -Append | Write-Host -ForegroundColor "DarkCyan"
+}
+
+function Log-Success($message, $logPath = ".\logs.txt")
+{
+    $message = "[$(Get-Date -Format 'yyyy-MM-dd hh:mm tt') S] $message"
+    Write-Output $message | Tee-Object -FilePath $logPath -Append | Write-Host -ForegroundColor "Green"
+}
+
+function Log-Warning($message, $logPath = ".\logs.txt")
+{
+    $message = "[$(Get-Date -Format 'yyyy-MM-dd hh:mm tt') W] $message"
+    Write-Output $message | Tee-Object -FilePath $logPath -Append | Write-Host -ForegroundColor "Yellow"
+}
+
+function Log-Error($message, $logPath = ".\logs.txt")
+{
+    $message = "[$(Get-Date -Format 'yyyy-MM-dd hh:mm tt') E] $message"
+    Write-Output $message | Tee-Object -FilePath $logPath -Append | Write-Host -ForegroundColor "Red"
+}
+
+function Invoke-APICallWithRateBackoff([ScriptBlock]$scriptBlock, $initialDelayInSeconds = 2, $maxRetries = 4)
+{
+    # Some APIs will throw a 429 exception if you run into their rate limits. This will try again after a backoff.
+    # Define a script block by wrapping in curly braces. E.g., $scriptBlock = { Invoke-RestMethod -Uri $uri -ErrorAction "Stop" }
+
+    $retryCount = 0
+    $delay = $initialDelayInSeconds
+    $keepGoing = $true
+    while ($keepGoing)
+    {
+        # The call operator (&). Invokes a script block in a new script scope.
+        # https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_operators?view=powershell-7.4#call-operator-
+        try 
+        {
+            $response = & $scriptBlock
+        }
+        catch 
+        {
+            if ([int]$_.Exception.Response.StatusCode -eq 429)
+            {
+                if ($retryCount -ge $maxRetries)
+                {
+                    Write-Warning "Reached the specified retry max. Moving on."
+                    $keepGoing = $false
+                    break
+                }
+                Write-Warning "$scriptBlock is being rate limited. Retrying in $delay seconds..."
+                Start-SleepTimer $delay                   
+                $delay *= 2
+                $retryCount++
+                continue
+            }
+            else
+            {
+                # If you get any error besides 429, it will throw it back down the call stack, so be sure to handle it!
+                throw $_
+            }
+        }
+        $keepGoing = $false
+    }    
+    return $response
+}
+
+
