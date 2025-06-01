@@ -596,6 +596,32 @@ function Prompt-Csv($expectedHeaders)
     return $records
 }
 
+function Import-UserCsv
+{
+    $csvPath = Read-Host "Enter path to user CSV (must be .csv)"
+    $csvPath = $csvPath.Trim('"')
+    return Import-Csv -Path $csvPath
+}
+
+function Confirm-CSVHasCorrectHeaders($importedCSV)
+{
+    $firstRecord = $importedCSV | Select-Object -First 1
+    $validCSV = $true
+
+    if (-not($firstRecord | Get-Member -MemberType NoteProperty -Name "UserPrincipalName"))
+    {
+        Write-Warning "This CSV file is missing a header called 'UserPrincipalName'."
+        $validCSV = $false
+    }
+
+    if (-not($validCSV))
+    {
+        Write-Host "Please make corrections to the CSV."
+        Read-Host "Press Enter to exit"
+        Exit
+    }
+}
+
 function Validate-CsvHeaders($importedCsv, $expectedHeaders)
 {
     $hasExpectedHeaders = $true
