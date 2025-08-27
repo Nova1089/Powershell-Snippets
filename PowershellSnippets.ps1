@@ -312,6 +312,16 @@ function Show-TimeStamp
     Write-Host $timestamp -ForegroundColor $infoColor
 }
 
+function Get-StandardDate
+{
+    return Get-Date -Format 'MM/dd/yyyy'
+}
+
+function Get-StandardDate
+{
+    return Get-Date -Format 'MM-dd-yyyy'
+}
+
 # new version basic
 function Prompt-YesOrNo($question)
 {
@@ -1057,25 +1067,25 @@ function Install-MSI($msiPath, [switch]$unattended, [switch]$waitUntilDone)
     }
 }
 
-function Log-Info($message, $logPath = ".\logs.txt")
+function Log-Info($message, $logPath = "$PSScriptRoot\logs.txt")
 {
     $message = "[$(Get-Date -Format 'yyyy-MM-dd hh:mm tt') I] $message"
     Write-Output $message | Tee-Object -FilePath $logPath -Append | Write-Host -ForegroundColor "DarkCyan"
 }
 
-function Log-Success($message, $logPath = ".\logs.txt")
+function Log-Success($message, $logPath = "$PSScriptRoot\logs.txt")
 {
     $message = "[$(Get-Date -Format 'yyyy-MM-dd hh:mm tt') S] $message"
     Write-Output $message | Tee-Object -FilePath $logPath -Append | Write-Host -ForegroundColor "Green"
 }
 
-function Log-Warning($message, $logPath = ".\logs.txt")
+function Log-Warning($message, $logPath = "$PSScriptRoot\logs.txt")
 {
     $message = "[$(Get-Date -Format 'yyyy-MM-dd hh:mm tt') W] $message"
     Write-Output $message | Tee-Object -FilePath $logPath -Append | Write-Host -ForegroundColor "Yellow"
 }
 
-function Log-Error($message, $logPath = ".\logs.txt")
+function Log-Error($message, $logPath = "$PSScriptRoot\logs.txt")
 {
     $message = "[$(Get-Date -Format 'yyyy-MM-dd hh:mm tt') E] $message"
     Write-Output $message | Tee-Object -FilePath $logPath -Append | Write-Host -ForegroundColor "Red"
@@ -1117,6 +1127,46 @@ function Invoke-APICallWithRateBackoff([ScriptBlock]$scriptBlock, $initialDelayI
             {
                 # If you get any error besides 429, it will throw it back down the call stack, so be sure to handle it!
                 throw $_
+            }
+        }
+        $keepGoing = $false
+    }    
+    return $response
+}
+
+function Invoke-APICallWithRateBackoff([ScriptBlock]$scriptBlock, $initialDelayInSeconds = 2, $maxRetries = 4)
+{
+    # Some APIs will throw a 429 exception if you run into their rate limits. This will try again after a backoff.
+    $retryCount = 0
+    $delay = $initialDelayInSeconds
+    $keepGoing = $true
+    while ($keepGoing)
+    {
+        try 
+        {
+            # The call operator (&). Invokes a script block in a new script scope.
+            # https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_operators?view=powershell-7.4#call-operator-
+            $response = & $scriptBlock
+        }
+        catch 
+        {
+            if ([int]$_.Exception.Response.StatusCode -eq 429)
+            {
+                if ($retryCount -gt $maxRetries)
+                {
+                    Write-Warning "Reached the specified retry max. Moving on."
+                    $keepGoing = $false
+                    break
+                }
+                Write-Warning "$scriptBlock is being rate limited. Retrying in $delay seconds..."
+                Start-SleepTimer $delay                   
+                $delay *= 2
+                $retryCount++
+                continue
+            }
+            else 
+            {
+                return $_
             }
         }
         $keepGoing = $false
